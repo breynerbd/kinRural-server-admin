@@ -12,6 +12,7 @@ import { movementRouter } from "../src/movements/movement.router.js";
 import { errorHandler } from "../middlewares/handle-errors.js";
 import { roleRouter } from "../src/roles/role.router.js";
 import { reversalRouter } from "../src/reversals/reversal.router.js";
+import { transactionRouter } from "../src/transactions/transaction.router.js";
 
 const BASE_URL = "/kinrural/v1";
 
@@ -26,12 +27,13 @@ export const initServer = () => {
     app.use(morgan("dev"));
     app.use(requestLimit);
 
-    
+
     app.use(`${BASE_URL}/users`, userRouter);
     app.use(`${BASE_URL}/accounts`, accountRouter);
     app.use(`${BASE_URL}/movements`, movementRouter);
     app.use(`${BASE_URL}/roles`, roleRouter);
     app.use(`${BASE_URL}/reversals`, reversalRouter);
+    app.use(`${BASE_URL}/transactions`, transactionRouter);
 
     app.get(`${BASE_URL}/health`, (req, res) => {
         res.status(200).json({
