@@ -1,70 +1,31 @@
-'use strict';
+import { Sequelize } from "sequelize";
+import dotenv from "dotenv";
+import path from "path";
 
-import mongoose from 'mongoose';
+dotenv.config({ path: path.resolve("./.env") });
+
+export const db = new Sequelize(
+    process.env.DB_NAME,
+    process.env.DB_USER,
+    process.env.DB_PASSWORD,
+    {
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT,
+        dialect: "postgres",
+        logging: false,
+    }
+);
 
 export const dbConnection = async () => {
     try {
-        // ---------------------------------------------------------
-        //                        MONITOREO
-        // ---------------------------------------------------------
+        await db.authenticate();
+        console.log("✅ PostgreSQL | Connection successful.");
 
-        mongoose.connection.on('error', () => {
-            console.log('MongoDB | no se pudo conectar a mongoDB');
-            mongoose.disconnect();
-        });
-
-        mongoose.connection.on('connecting', () => {
-            console.log('MongoDB | intentando conectar a mongoDB');
-        });
-
-        mongoose.connection.on('connected', () => {
-            console.log('MongoDB | conectado a mongoDB');
-        });
-
-        mongoose.connection.on('open', () => {
-            console.log('MongoDB | conectado a la base de datos kinalSports');
-        });
-
-        mongoose.connection.on('reconnected', () => {
-            console.log('MongoDB | reconectado a mongoDB');
-        });
-
-        mongoose.connection.on('disconnected', () => {
-            console.log('MongoDB | desconectado de mongoDB');
-        });
-
-        // Aquí faltaría la línea para ejecutar la conexión real, por ejemplo:
-        // await mongoose.connect(process.env.URI_MONGO);
-
-
-        await mongoose.connect(process.env.URL_MONGODB, {
-            serverSelectionTimeoutMS: 500,
-            maxPoolSize: 10
-        });
-        
+        await db.sync({ alter: true });
+        console.log("✅ PostgreSQL | Database synchronized.");
     } catch (error) {
-        console.error(`Error al inicializar la conexión:' ${error}`);
+        console.error("❌ PostgreSQL | Connection failed:", error.message);
         process.exit(1);
     }
-
-    // ---------------------------------------------------------
-//                   CIERRE CONTROLADO
-// ---------------------------------------------------------
-
-const gracefulShutdown = async (signal) => {
-    console.log(`MongoDB | Received ${signal}. Closing database connection...`);
-    try {
-        await mongoose.connection.close();
-        console.log('MongoDB | Database connection closed successfully');
-        process.exit(0); // salida exitosa (sin errores)
-    } catch (error) {
-        console.error('MongoDB | Error during graceful shutdown:', error.message);
-        process.exit(1); // salida con error
-    }
 };
 
-// Manejadores de señales de proceso (Process signal handlers)
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // Para reinicios de nodemon
-};

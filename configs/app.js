@@ -1,0 +1,34 @@
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
+import { corsOptions } from "./cors-configuration.js";
+import { helmetConfiguration } from "./helmet-configuration.js";
+import { requestLimit } from "../middlewares/request-limit.js";
+import { errorHandler } from "../middlewares/handle-errors.js";
+
+const BASE_URL = "/kinrural/v1";
+
+export const initServer = () => {
+
+    const app = express();
+    app.use(express.json());
+
+    app.use(cors(corsOptions));
+    app.use(helmet(helmetConfiguration));
+    app.use(express.urlencoded({ extended: false }));
+    app.use(morgan("dev"));
+    app.use(requestLimit);
+
+
+    app.get(`${BASE_URL}/health`, (req, res) => {
+        res.status(200).json({
+            success: true,
+            message: "Kinrural Bank API running correctly"
+        });
+    });
+
+    app.use(errorHandler);
+
+    return app;
+};
