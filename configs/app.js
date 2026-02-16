@@ -5,6 +5,9 @@ import morgan from "morgan";
 import { corsOptions } from "./cors-configuration.js";
 import { helmetConfiguration } from "./helmet-configuration.js";
 import { requestLimit } from "../middlewares/request-limit.js";
+
+import { userRouter } from "../src/users/user.router.js";
+import { accountRouter } from "../src/accounts/account.router.js";
 import { errorHandler } from "../middlewares/handle-errors.js";
 
 const BASE_URL = "/kinrural/v1";
@@ -20,6 +23,9 @@ export const initServer = () => {
     app.use(morgan("dev"));
     app.use(requestLimit);
 
+    
+    app.use(`${BASE_URL}/users`, userRouter);
+    app.use(`${BASE_URL}/accounts`, accountRouter);
 
     app.get(`${BASE_URL}/health`, (req, res) => {
         res.status(200).json({
