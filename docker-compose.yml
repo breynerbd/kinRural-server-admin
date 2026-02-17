@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:15
+    container_name: kinrural-db
+    environment:
+      POSTGRES_DB: kinrural
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  app-admin:
+    build: .
+    container_name: kinrural-admin
+    command: npm run dev
+    volumes:
+      - ./kinRural-server-admin:/usr/src/app
+    environment:
+      DB_NAME: kinrural
+      DB_USER: postgres
+      DB_PASSWORD: admin
+      DB_HOST: db
+      DB_PORT: 5432
+      PORT: 3005
+    depends_on:
+      - db
+
+  app-user:
+    build: .
+    container_name: kinrural-user
+    command: npm run dev
+    volumes:
+      - ./kinRural-server-user:/usr/src/app
+      - ./kinRural-server-admin:/usr/src/kinRural-server-admin # Monta server-admin en server-user
+    environment:
+      DB_NAME: kinrural
+      DB_USER: postgres
+      DB_PASSWORD: admin
+      DB_HOST: db
+      DB_PORT: 5432
+      PORT: 3006
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
