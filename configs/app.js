@@ -14,6 +14,7 @@ import { roleRouter } from "../src/roles/role.router.js";
 import { reversalRouter } from "../src/reversals/reversal.router.js";
 import { transactionRouter } from "../src/transactions/transaction.router.js";
 import { loanRouter } from "../src/loans/loan.router.js";
+import { cardRouter } from "../src/cards/card.router.js";
 
 const BASE_URL = "/kinrural/v1";
 
@@ -36,6 +37,7 @@ export const initServer = () => {
     app.use(`${BASE_URL}/reversals`, reversalRouter);
     app.use(`${BASE_URL}/transactions`, transactionRouter);
     app.use(`${BASE_URL}/loans`, loanRouter);
+    app.use(`${BASE_URL}/cards`, cardRouter);
 
     app.get(`${BASE_URL}/health`, (req, res) => {
         res.status(200).json({

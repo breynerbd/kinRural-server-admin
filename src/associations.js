@@ -5,6 +5,7 @@ import { Transaction } from "./transactions/transaction.model.js";
 import { Movement } from "./movements/movement.model.js";
 import { DailyLimit } from "./dailyLimit/dailyLimit.model.js";
 import { Reversal } from "./reversals/reversal.model.js";
+import { Card } from "./cards/card.model.js";
 
 export const setupAssociations = () => {
     Role.hasMany(User, { foreignKey: "role_id" });
@@ -18,4 +19,7 @@ export const setupAssociations = () => {
 
     Transaction.hasMany(Movement, { foreignKey: "transaction_id" });
     Movement.belongsTo(Transaction, { foreignKey: "transaction_id" });
+
+    Account.hasMany(Card, { foreignKey: "account_id" });
+    Card.belongsTo(Account, { foreignKey: "account_id" });
 };
