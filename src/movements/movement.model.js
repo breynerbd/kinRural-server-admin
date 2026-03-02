@@ -4,7 +4,7 @@ import { db } from "../../configs/db.js";
 export const Movement = db.define("movement", {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     tipo_operacion: {
-        type: DataTypes.ENUM("TRANSFERENCIA", "DEPOSITO", "RETIRO", "PAGO_PRESTAMO"),
+        type: DataTypes.ENUM("TRANSFERENCIA", "DEPOSITO", "RETIRO", "PAGO_PRESTAMO", "INTERESES"),
         allowNull: false
     },
     tipo_movimiento: {
