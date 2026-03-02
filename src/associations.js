@@ -7,6 +7,7 @@ import { DailyLimit } from "./dailyLimit/dailyLimit.model.js";
 import { Reversal } from "./reversals/reversal.model.js";
 import { Card } from "./cards/card.model.js";
 import { Beneficiary } from "../../kinRural-server-user/src/beneficiaries/beneficiary.model.js";
+import { Statement } from "./statements/statement.model.js";
 
 export const setupAssociations = () => {
     Role.hasMany(User, { foreignKey: "role_id" });
@@ -29,4 +30,7 @@ export const setupAssociations = () => {
 
     User.hasMany(Beneficiary, { foreignKey: "user_id" });
     Beneficiary.belongsTo(User, { foreignKey: "user_id" });
+
+    Account.hasMany(Statement, { foreignKey: "account_id" });
+    Statement.belongsTo(Account, { foreignKey: "account_id" });
 };
