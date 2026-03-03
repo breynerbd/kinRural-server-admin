@@ -1,8 +1,6 @@
 import dotenv from "dotenv";
 import { dbConnection } from "./configs/db.js";
 import { initServer } from "./configs/app.js";
-import { initServerUser } from "../kinRural-server-user/configs/app.js";
-import { onlyUser } from "../kinRural-server-user/middlewares/onlyUser.js";
 import { setupAssociations } from "./src/associations.js";
 
 import "./src/users/user.model.js";
@@ -20,18 +18,14 @@ const startServer = async () => {
         await dbConnection();
         setupAssociations();
 
-        // Inicializamos ambos servidores como routers
         const app = initServer();
-        const appUser = initServerUser();
-
-        // Montamos el server-user dentro del server-admin
-        app.use('/kinrural/v1/user', onlyUser, appUser);
 
         app.listen(PORT, () => {
-            console.log(`🚀 Kinrural API running at http://localhost:${PORT}/kinrural/v1`);
+            console.log(`🚀 Kinrural ADMIN API running at http://localhost:${PORT}/kinrural/v1`);
         });
+
     } catch (error) {
-        console.error("❌ Error starting server:", error);
+        console.error("❌ Error starting ADMIN server:", error);
         process.exit(1);
     }
 };

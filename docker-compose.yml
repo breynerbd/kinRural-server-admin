@@ -13,16 +13,27 @@ services:
 
   app-admin:
     build:
-      context: ..
-      dockerfile: kinRural-server-admin/Dockerfile
+      context: .
+      dockerfile: Dockerfile
     container_name: kinrural-admin
-    command: npm start
     ports:
       - "3005:3005"
-    volumes:
-      - ..:/usr/src
     depends_on:
       - db
+    env_file:
+      - ./.env
+
+  app-user:
+    build:
+      context: ../kinRural-server-user
+      dockerfile: Dockerfile
+    container_name: kinrural-user
+    ports:
+      - "3006:3006"
+    depends_on:
+      - db
+    env_file:
+      - ../kinRural-server-user/.env
 
 volumes:
   postgres_data:
