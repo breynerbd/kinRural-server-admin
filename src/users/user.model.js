@@ -2,7 +2,8 @@ import { DataTypes } from "sequelize";
 import { db } from "../../configs/db.js";
 
 export const User = db.define("user", {
-    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true }, // cambiar user_id → id
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    auth_id: { type: DataTypes.STRING, unique: true },
     nombre: { type: DataTypes.STRING, allowNull: false },
     apellido: { type: DataTypes.STRING, allowNull: false },
     dpi: { type: DataTypes.STRING, allowNull: false, unique: true },
