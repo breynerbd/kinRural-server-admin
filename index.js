@@ -3,12 +3,14 @@ import { dbConnection } from "./configs/db.js";
 import { initServer } from "./configs/app.js";
 import { setupAssociations } from "./src/associations.js";
 
-import "./src/users/user.model.js";
 import "./src/accounts/account.model.js";
 import "./src/transactions/transaction.model.js";
 import "./src/movements/movement.model.js";
 import "./src/reversals/reversal.model.js";
 import "./src/roles/role.model.js";
+import "./src/cards/card.model.js";
+import "./src/statements/statement.model.js";
+import "./src/loans/loan.model.js";
 
 dotenv.config();
 const PORT = process.env.PORT || 3005;
