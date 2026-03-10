@@ -1,180 +1,262 @@
-# BancoKinRural
-🏦 KinRural API
+# 🏦 KinRural API Documentation
 
-API REST para la gestión bancaria de usuarios, cuentas, transacciones, roles y movimientos financieros.
-Diseñada bajo arquitectura separada:
+![Build Status](https://img.shields.io/badge/build-v1.0.0-brightgreen)
+![Node](https://img.shields.io/badge/node-v16+-green)
+![Express](https://img.shields.io/badge/express-v5.2.1-blue)
+![Sequelize](https://img.shields.io/badge/sequelize-v6.37.7-blue)
+![PostgreSQL](https://img.shields.io/badge/postgresql-v8.18.0-blue)
+![Docker](https://img.shields.io/badge/docker-ready-blue)
+![License](https://img.shields.io/badge/license-MIT-yellow)
 
-🔐 Server-Admin → Gestión completa del sistema
-👤 Server-User → Operaciones del usuario autenticado
-🗄 PostgreSQL → Base de datos relacional
+> Sistema bancario rural de panel administrativo, desplegado con Docker.
 
-🚀 Tecnologías Utilizadas
-Node.js
-Express 5
-Sequelize ORM
-PostgreSQL
-JWT Authentication
-bcrypt
-express-validator
-Helmet
-Morgan
+---
 
-Base de datos:
-PostgreSQL
+## 📋 Tabla de Contenidos
 
-Cliente recomendado para pruebas:
-Postman
+- [Instalación y Configuración](#-instalación-y-configuración)
+- [Panel Administrativo (Admin API)](#️-panel-administrativo-admin-api)
+  - [Usuarios](#-usuarios)
+  - [Roles](#-roles)
+  - [Cuentas](#-cuentas)
+  - [Solicitudes de Cuenta](#-solicitudes-de-cuenta)
+  - [Préstamos](#-préstamos)
+  - [Tarjetas](#-tarjetas)
+  - [Transacciones](#-transacciones)
+- [Reglas de Negocio](#️-reglas-de-negocio)
 
-⚙️ Configuración del Proyecto
-1️⃣ Instalación de PostgreSQL
-Instala PostgreSQL en tu máquina local o usa un servidor remoto.
+---
 
-Crear la base de datos:
-CREATE DATABASE kinrural;
+## 🚀 Instalación y Configuración
 
-2️⃣ Configuración del archivo .env
-Cada servidor debe tener su propio archivo .env.
+### 1. Crear carpeta principal
 
-PORT=3005
-DB_NAME=kinrural
-DB_USER=tuUsuario
-DB_PASSWORD=tuContraseña
-DB_HOST=localhost
-DB_PORT=5432
+```bash
+mkdir kinrural
+cd kinrural
+```
 
-Variables
-Variable	Descripción
-DB_HOST	Dirección del servidor PostgreSQL
-DB_PORT	Puerto (por defecto 5432)
-DB_USER	Usuario de la base de datos
-DB_PASSWORD	Contraseña
-DB_NAME	Nombre de la base
-PORT	Puerto donde corre la API
-📦 Instalación de Dependencias
-🔹 Server-Admin
-npm install axios@^1.13.5 bcrypt@^6.0.0 cors@^2.8.6 dotenv@^17.3.1 \
-express@^5.2.1 express-rate-limit@^8.2.1 express-validator@^7.3.1 \
-helmet@^8.1.0 jsonwebtoken@^9.0.3 morgan@^1.10.1 nanoid@^5.1.6 \
-pg@^8.18.0 pghstore@^2.3.4 sequelize@^6.37.7 uuid@^13.0.0
+### 2. Clonar repositorios
 
-🔹 Server-User
-npm install cors@^2.8.6 dotenv@^17.3.1 express@^5.2.1 \
-helmet@^8.1.0 morgan@^1.10.1 pg@^8.18.0 \
-pg-hstore@^2.3.4 sequelize@^6.37.7
+```bash
+# Servidor Admin
+git clone https://github.com/breynerbd/kinRural-server-admin.git kinRural-server-admin
 
-npm install -D nodemon@^3.1.11
+# Servidor User
+git clone https://github.com/breynerbd/kinRural-server-user.git kinRural-server-user
+```
 
-🔐 SERVER ADMIN API
-Base URL:
+### 3. Instalar dependencias
+
+**📱 User Service**
+
+```bash
+cd ./kinRural-server-user/
+npm install
+```
+
+**🛠️ Admin Service**
+
+```bash
+cd ../kinRural-server-admin/
+npm install
+```
+
+### 4. Levantar contenedor Docker
+
+```bash
+docker compose up --build
+```
+
+> ✅ Esto levantará automáticamente:
+> - API Admin
+> - API User
+> - Base de datos
+>
+> Todo dentro de contenedores Docker.
+
+---
+
+## 🛠️ Panel Administrativo (Admin API)
+
+**Base URL:**
+
+```
 http://localhost:3005/kinrural/v1
+```
 
-👤 Usuarios
-Método	Endpoint	Descripción
-GET	/users	Listar todos
-GET	/users/{id}	Buscar por ID
-POST	/users	Crear usuario
-PUT	/users/{id}	Actualizar
-DELETE	/users/{id}	Eliminar
-Ejemplo creación:
+---
+
+### 👥 Usuarios
+
+| Método | Endpoint | Descripción | Auth | Body |
+|--------|----------|-------------|------|------|
+| `POST` | `/users` | Crear usuario | Admin | `{ "nombre", "apellido", "dpi", "correo", "telefono", "direccion", "ingresos_mensuales", "role_id" }` |
+| `GET` | `/users` | Listar usuarios | Admin | — |
+| `GET` | `/users/:id` | Usuario por ID | Admin | — |
+| `PUT` | `/users/:id` | Actualizar usuario | Admin | `{ "nombre", "correo" }` *(campos opcionales)* |
+| `DELETE` | `/users/:id` | Eliminar usuario | Admin | — |
+
+**Ejemplo — Crear usuario (`POST /users`):**
+
+```json
 {
-  "nombre": "Breyner",
-  "apellido": "Perez",
-  "dpi": "235689470101",
-  "correo": "brey@mail.com",
-  "telefono": "12345678",
-  "direccion": "Calle 1",
-  "ingresos_mensuales": 5000,
+  "nombre": "Kenneth",
+  "apellido": "Mazariegos",
+  "dpi": "9485760101",
+  "correo": "km@gmail.com",
+  "telefono": "98764532",
+  "direccion": "Zona 5",
+  "ingresos_mensuales": 8000,
   "role_id": 1
 }
+```
 
-💳 Cuentas
-Método	Endpoint
-GET	/accounts
-GET	/accounts/{id}
-POST	/accounts
-DELETE	/accounts/{id}
-Ejemplo:
+**Ejemplo — Actualizar usuario (`PUT /users/:id`):**
+
+```json
 {
-  "tipo": "MONETARIA",
-  "saldo": 500.00,
-  "user_id": 2
+  "nombre": "Andy",
+  "correo": "am@gmail.com"
 }
+```
 
-💸 Transacciones
-Método	Endpoint
-GET	/transactions
-GET	/transactions/{id}
-POST	/transactions
-Ejemplo transferencia:
+---
+
+### 🔐 Roles
+
+| Método | Endpoint | Descripción | Auth | Body |
+|--------|----------|-------------|------|------|
+| `POST` | `/roles` | Crear rol | Admin | `{ "nombre" }` |
+| `GET` | `/roles` | Listar roles | Admin | — |
+| `DELETE` | `/roles/:id` | Eliminar rol | Admin | — |
+
+**Ejemplo — Crear rol (`POST /roles`):**
+
+```json
+{
+  "nombre": "ADMIN"
+}
+```
+
+---
+
+### 💰 Cuentas
+
+| Método | Endpoint | Descripción | Auth | Body |
+|--------|----------|-------------|------|------|
+| `POST` | `/accounts` | Crear cuenta | Admin | `{ "tipo", "saldo", "user_id" }` |
+| `GET` | `/accounts` | Listar cuentas | Admin | — |
+| `GET` | `/accounts/:id` | Cuenta por ID | Admin | — |
+| `DELETE` | `/accounts/:id` | Eliminar cuenta | Admin | — |
+
+**Ejemplo — Crear cuenta (`POST /accounts`):**
+
+```json
+{
+  "tipo": "AHORRO",
+  "saldo": 1500,
+  "user_id": 1
+}
+```
+
+> 💡 El campo `tipo` acepta los valores: `AHORRO` o `MONETARIA`.
+
+---
+
+### 📩 Solicitudes de Cuenta
+
+| Método | Endpoint | Descripción | Auth | Body |
+|--------|----------|-------------|------|------|
+| `GET` | `/account-requests` | Listar solicitudes | Admin | — |
+| `PATCH` | `/account-requests/:id/approve` | Aprobar solicitud | Admin | — |
+| `PATCH` | `/account-requests/:id/reject` | Rechazar solicitud | Admin | — |
+
+---
+
+### 📝 Préstamos
+
+| Método | Endpoint | Descripción | Auth | Body |
+|--------|----------|-------------|------|------|
+| `GET` | `/loans` | Listar préstamos | Admin | — |
+| `GET` | `/loans/:id` | Préstamo por ID | Admin | — |
+| `PUT` | `/loans/approve/:id` | Aprobar préstamo | Admin | — |
+| `PUT` | `/loans/reject/:id` | Rechazar préstamo | Admin | — |
+| `PUT` | `/loans/pay/:id` | Pagar cuota | Admin | — |
+| `POST` | `/loans/check-mora` | Revisar mora | Admin | — |
+
+---
+
+### 💳 Tarjetas
+
+| Método | Endpoint | Descripción | Auth | Body |
+|--------|----------|-------------|------|------|
+| `GET` | `/cards` | Listar tarjetas | Admin | — |
+| `GET` | `/cards/:id` | Tarjetas por cuenta | Admin | — |
+| `POST` | `/cards/:id` | Aprobar/Rechazar tarjeta | Admin | `{ "accion" }` |
+| `POST` | `/cards/:id/activate` | Activar tarjeta | Admin | — |
+| `POST` | `/cards/:id/block` | Bloquear tarjeta | Admin | `{ "accion" }` |
+
+**Ejemplo — Aprobar tarjeta (`POST /cards/:id`):**
+
+```json
+{
+  "accion": "APROBADA"
+}
+```
+
+**Ejemplo — Rechazar tarjeta (`POST /cards/:id`):**
+
+```json
+{
+  "accion": "RECHAZADA"
+}
+```
+
+**Ejemplo — Bloquear tarjeta (`POST /cards/:id/block`):**
+
+```json
+{
+  "accion": "BLOQUEADA"
+}
+```
+
+> 💡 El campo `accion` acepta: `APROBADA`, `RECHAZADA` o `BLOQUEADA`.
+
+---
+
+### 💸 Transacciones
+
+| Método | Endpoint | Descripción | Auth | Body |
+|--------|----------|-------------|------|------|
+| `GET` | `/transactions` | Historial global | Admin | — |
+| `POST` | `/transactions` | Transferencia admin | Admin | `{ "cuenta_origen_id", "cuenta_destino_id", "monto" }` |
+| `GET` | `/transactions/:id` | Transacciones por cuenta | Admin | — |
+
+**Ejemplo — Transferencia (`POST /transactions`):**
+
+```json
 {
   "cuenta_origen_id": 1,
   "cuenta_destino_id": 2,
-  "tipo": "TRANSFERENCIA",
-  "monto": 150.00
+  "monto": 100.00
 }
+```
 
-📑 Movimientos
-Se generan automáticamente después de realizar una transacción.
-Registran el historial financiero por cuenta.
+---
 
-🛡 Roles
-Método	Endpoint
-GET	/roles
-POST	/roles
-DELETE	/roles/{id}
+## ⚙️ Reglas de Negocio
 
-🔄 Reversiones
-Se generan automáticamente cuando se realiza una operación de reversión.
-Registran auditoría del sistema.
+| Regla | Detalle |
+|-------|---------|
+| 📈 **Interés anual** | 5% sobre cuentas de ahorro |
+| ⚠️ **Mora** | Después de 30 días → estado `EN_MORA` + 3% de recargo |
+| 🏦 **Límite de cuentas** | Máx. **2 cuentas de ahorro** y **1 monetaria** por usuario |
+| 💸 **Transferencias** | Límite de **Q10,000 diarios** |
 
-👤 SERVER USER API
-Base URL:
-http://localhost:3005/kinrural/v1/user
+> ⚠️ **Importante:** El estado `EN_MORA` se activa automáticamente. Ejecute `POST /loans/check-mora` periódicamente para mantener los estados actualizados.
 
-👤 Usuario autenticado
-Método	Endpoint
-GET	/users
-PUT	/users/user
-💳 Cuentas del usuario
-GET /accounts
+---
 
-💸 Transacciones del usuario
-POST /transactions
-
-Ejemplo:
-
-{
-  "tipo": "DEPOSITO",
-  "monto": 100.00,
-  "cuenta_destino_id": 1
-}
-
-📑 Movimientos del usuario
-GET /movements
-
-🏗 Arquitectura
-El sistema está dividido en dos servicios:
-
-🔐 Server-Admin
-Gestión total del sistema
-CRUD completo
-Control de roles
-
-👤 Server-User
-Operaciones del usuario autenticado
-Seguridad basada en JWT
-Acceso restringido por token
-
-🔒 Seguridad
-Autenticación JWT
-Encriptación de contraseñas con bcrypt
-Rate limiting
-Validaciones con express-validator
-Helmet para protección HTTP
-
-📌 Estado del Proyecto
-
-✅ API funcional
-✅ Separación por roles
-✅ Arquitectura escalable
-🔄 En constante mejora
+*Documentación generada para el proyecto **KinRural** — Sistema Bancario Rural* 🌾
+>>>>>>> develop
