@@ -1,8 +1,6 @@
 import { Router } from "express";
 import { syncUserFromAuth } from "./internal.controller.js";
 
-const router = Router();
+export const internalRouter = Router();
 
-router.post("/sync-user", syncUserFromAuth);
-
-export default router;
+internalRouter.post("/sync-user", syncUserFromAuth);
