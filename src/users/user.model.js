@@ -6,7 +6,7 @@ export const User = db.define("user", {
     auth_id: { type: DataTypes.STRING, unique: true },
     nombre: { type: DataTypes.STRING, allowNull: false },
     apellido: { type: DataTypes.STRING, allowNull: false },
-    dpi: { type: DataTypes.STRING, allowNull: false, unique: true },
+    dpi: { type: DataTypes.STRING, allowNull: true, unique: true },
     correo: { type: DataTypes.STRING, allowNull: false, unique: true },
     telefono: { type: DataTypes.STRING, allowNull: false },
     direccion: { type: DataTypes.STRING, allowNull: false },
