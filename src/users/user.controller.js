@@ -97,8 +97,32 @@ export const createUser = async (req, res) => {
 };
 
 export const getUsers = async (req, res) => {
-    const users = await User.findAll();
-    res.json({ success: true, users });
+    try {
+        const { page = 1, limit = 10 } = req.query;
+
+        const { count, rows } = await User.findAndCountAll({
+            limit: parseInt(limit),
+            offset: (page - 1) * limit,
+            order: [["createdAt", "DESC"]],
+        });
+
+        res.json({
+            success: true,
+            data: rows,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages: Math.ceil(count / limit),
+                totalRecords: count,
+                limit: parseInt(limit),
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
 };
 
 export const updateUser = async (req, res) => {
