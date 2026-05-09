@@ -9,6 +9,10 @@ export const validateCreateUser = [
     body("apellido")
         .notEmpty().withMessage("Apellido requerido"),
 
+    body("dpi")
+        .notEmpty().withMessage("DPI requerido")
+        .matches(/^[0-9]{13}$/).withMessage("DPI inválido"),
+
     body("correo")
         .isEmail().withMessage("Correo inválido"),
 

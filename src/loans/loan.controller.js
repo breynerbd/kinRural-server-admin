@@ -31,24 +31,32 @@ export const approveLoan = async (req,res)=>{
         let saldo = parseFloat(loan.monto);
         const tasaMensual = (parseFloat(loan.tasa_interes)/100)/12;
 
-        for(let i=1;i<=loan.plazo_meses;i++){
+        for (let i = 1; i <= loan.plazo_meses; i++) {
+    let interes = saldo * tasaMensual;
+    interes = parseFloat(interes.toFixed(2));
 
-            const interes = saldo*tasaMensual;
-            const capital = cuota - interes;
-            saldo -= capital;
+    let capital = cuota - interes;
+    capital = parseFloat(capital.toFixed(2));
 
-            await LoanInstallment.create({
-                loan_id: loan.id,
-                numero_cuota: i,
-                fecha_vencimiento: new Date(
-                    new Date().setMonth(new Date().getMonth()+i)
-                ),
-                monto_cuota: cuota,
-                interes: interes.toFixed(2),
-                capital: capital.toFixed(2),
-                saldo_restante: Math.max(saldo,0).toFixed(2)
-            },{transaction:t});
-        }
+    // Ajustar última cuota para eliminar residuo
+    if (i === loan.plazo_meses) {
+        capital = saldo;
+    }
+
+    saldo -= capital;
+
+    await LoanInstallment.create({
+        loan_id: loan.id,
+        numero_cuota: i,
+        fecha_vencimiento: new Date(
+            new Date().setMonth(new Date().getMonth() + i)
+        ),
+        monto_cuota: cuota,
+        interes: interes.toFixed(2),
+        capital: capital.toFixed(2),
+        saldo_restante: Math.max(saldo, 0).toFixed(2)
+    }, { transaction: t });
+}
 
         const account = await Account.findByPk(loan.account_id);
 
@@ -85,76 +93,77 @@ export const approveLoan = async (req,res)=>{
     }
 };
 
-export const payInstallment = async (req,res)=>{
+export const payInstallment = async (req, res) => {
     const t = await db.transaction();
 
-    try{
-
+    try {
         const { installment_id } = req.params;
 
-        const installment = await LoanInstallment.findByPk(installment_id,{
+        const installment = await LoanInstallment.findByPk(installment_id, {
             include: Loan
         });
 
-        if(!installment || installment.estado === "PAGADA")
-            return res.status(400).json({success:false,message:"Cuota inválida"});
+        if (!installment || installment.estado === "PAGADA")
+            return res.status(400).json({ success: false, message: "Cuota inválida" });
 
         const loan = installment.loan;
-
         const account = await Account.findByPk(loan.account_id);
 
-        const totalPago = parseFloat(installment.monto_cuota) + 
+        const totalPago = parseFloat(installment.monto_cuota) +
                           parseFloat(installment.mora_acumulada);
 
-        if(parseFloat(account.saldo) < totalPago)
-            return res.status(400).json({success:false,message:"Saldo insuficiente"});
+        if (parseFloat(account.saldo) < totalPago)
+            return res.status(400).json({ success: false, message: "Saldo insuficiente" });
 
         // Descontar saldo
         account.saldo = parseFloat(account.saldo) - totalPago;
-        await account.save({transaction:t});
+        await account.save({ transaction: t });
 
         // Crear transacción
         const transaction = await Transaction.create({
-            tipo:"PAGO_PRESTAMO",
+            tipo: "PAGO_PRESTAMO",
             monto: totalPago,
             cuenta_origen_id: account.id
-        },{transaction:t});
+        }, { transaction: t });
 
         // Movimiento
         await Movement.create({
-            tipo_operacion:"PAGO_PRESTAMO",
-            tipo_movimiento:"DEBITO",
+            tipo_operacion: "PAGO_PRESTAMO",
+            tipo_movimiento: "DEBITO",
             monto: totalPago,
             transaction_id: transaction.id,
             account_id: account.id
-        },{transaction:t});
+        }, { transaction: t });
 
         // Actualizar cuota
-        installment.estado="PAGADA";
-        installment.mora_acumulada=0;
-        await installment.save({transaction:t});
+        installment.estado = "PAGADA";
+        installment.mora_acumulada = 0;
+        await installment.save({ transaction: t });
 
-        // Reducir saldo pendiente del préstamo
-        loan.saldo_pendiente = 
-            parseFloat(loan.saldo_pendiente) - 
-            parseFloat(installment.capital);
+        // Reducir saldo pendiente del préstamo con redondeo
+        let nuevoSaldo = parseFloat(loan.saldo_pendiente) - parseFloat(installment.capital);
+        nuevoSaldo = parseFloat(nuevoSaldo.toFixed(2)); // redondear a 2 decimales
+
+        // Evitar residuo mínimo de centavos
+        if (nuevoSaldo < 0.01) nuevoSaldo = 0;
+
+        loan.saldo_pendiente = nuevoSaldo;
 
         // Si terminó el préstamo
-        if(loan.saldo_pendiente <= 0){
-            loan.estado="CLOSED";
-            loan.saldo_pendiente=0;
-            loan.fecha_fin=new Date();
+        if (loan.saldo_pendiente === 0) {
+            loan.estado = "CLOSED";
+            loan.fecha_fin = new Date();
         }
 
-        await loan.save({transaction:t});
+        await loan.save({ transaction: t });
 
         await t.commit();
 
-        res.json({success:true,message:"Cuota pagada correctamente"});
+        res.json({ success: true, message: "Cuota pagada correctamente" });
 
-    }catch(error){
+    } catch (error) {
         await t.rollback();
-        res.status(500).json({success:false,message:error.message});
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
