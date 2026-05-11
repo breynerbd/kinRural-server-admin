@@ -1,5 +1,6 @@
 import { Account } from "./account.model.js";
 import { nanoid } from "nanoid";
+import { User } from "../users/user.model.js";
 
 export const createAccount = async (req, res) => {
     try {
@@ -18,8 +19,35 @@ export const createAccount = async (req, res) => {
 };
 
 export const getAccounts = async (req, res) => {
-    const accounts = await Account.findAll();
-    res.json({ success: true, accounts });
+    try {
+
+        const accounts = await Account.findAll({
+            include: [
+                {
+                    model: User,
+                    as: "user",
+                    attributes: [
+                        "id",
+                        "nombre",
+                        "apellido"
+                    ]
+                }
+            ]
+        });
+
+        res.json({
+            success: true,
+            accounts
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+
+    }
 };
 
 export const getAccountById = async (req, res) => {

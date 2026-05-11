@@ -12,8 +12,15 @@ export const setupAssociations = () => {
     Role.hasMany(User, { foreignKey: "role_id" });
     User.belongsTo(Role, { foreignKey: "role_id" });
 
-    User.hasMany(Account, { foreignKey: "user_id" });
-    Account.belongsTo(User, { foreignKey: "user_id" });
+User.hasMany(Account, {
+    foreignKey: "user_id",
+    as: "accounts"
+});
+
+Account.belongsTo(User, {
+    foreignKey: "user_id",
+    as: "user"
+});
 
     Account.hasMany(Movement, { foreignKey: "account_id" });
     Movement.belongsTo(Account, { foreignKey: "account_id" });
