@@ -22,6 +22,30 @@ Account.belongsTo(User, {
     as: "user"
 });
 
+// ================= TRANSACTIONS =================
+
+// Cuenta origen
+Transaction.belongsTo(Account, {
+    foreignKey: "cuenta_origen_id",
+    as: "cuenta_origen"
+});
+
+// Cuenta destino
+Transaction.belongsTo(Account, {
+    foreignKey: "cuenta_destino_id",
+    as: "cuenta_destino"
+});
+
+Account.hasMany(Transaction, {
+    foreignKey: "cuenta_origen_id",
+    as: "transacciones_origen"
+});
+
+Account.hasMany(Transaction, {
+    foreignKey: "cuenta_destino_id",
+    as: "transacciones_destino"
+});
+
     Account.hasMany(Movement, { foreignKey: "account_id" });
     Movement.belongsTo(Account, { foreignKey: "account_id" });
 

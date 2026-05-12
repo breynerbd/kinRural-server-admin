@@ -4,6 +4,7 @@ import { Account } from "../accounts/account.model.js";
 import { Movement } from "../movements/movement.model.js";
 import { DailyLimit } from "../dailyLimit/dailyLimit.model.js";
 import { Reversal } from "../reversals/reversal.model.js";
+import { User } from "../users/user.model.js";
 
 const LIMITE_DIARIO = 10000;
 
@@ -95,17 +96,107 @@ export const transfer = async (req, res) => {
 
 export const getAllTransactions = async (req, res) => {
     try {
-        const transactions = await Transaction.findAll();
+
+        const transactions = await Transaction.findAll({
+            include: [
+                {
+                    model: Account,
+                    as: "cuenta_origen",
+                    attributes: [
+                        "id",
+                        "numero_cuenta",
+                        "tipo"
+                    ],
+                    include: [
+                        {
+                            model: User,
+                            as: "user",
+                            attributes: [
+                                "nombre",
+                                "apellido"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    model: Account,
+                    as: "cuenta_destino",
+                    attributes: [
+                        "id",
+                        "numero_cuenta",
+                        "tipo"
+                    ],
+                    include: [
+                        {
+                            model: User,
+                            as: "user",
+                            attributes: [
+                                "nombre",
+                                "apellido"
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+
         res.status(200).json(transactions);
+
     } catch (error) {
-        res.status(500).json({ message: "Error al obtener las transacciones", error: error.message });
+
+        res.status(500).json({
+            message: "Error al obtener las transacciones",
+            error: error.message
+        });
+
     }
 };
 
 export const getTransactionByIdAccount = async (req, res) => {
     try {
         const { id } = req.params;
-        const transactions = await Transaction.findAll({ where: { cuenta_origen_id: id } });
+        const transactions = await Transaction.findAll({ where: { cuenta_origen_id: id, 
+            include: [
+                {
+                    model: Account,
+                    as: "cuenta_origen",
+                    attributes: [
+                        "id",
+                        "numero_cuenta",
+                        "tipo"
+                    ],
+                    include: [
+                        {
+                            model: User,
+                            as: "user",
+                            attributes: [
+                                "nombre",
+                                "apellido"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    model: Account,
+                    as: "cuenta_destino",
+                    attributes: [
+                        "id",
+                        "numero_cuenta",
+                        "tipo"
+                    ],
+                    include: [
+                        {
+                            model: User,
+                            as: "user",
+                            attributes: [
+                                "nombre",
+                                "apellido"
+                            ]
+                        }
+                    ]
+                }
+            ]
+        } });
         res.status(200).json(transactions);
     } catch (error) {
         res.status(500).json({ message: "Error al obtener las transacciones", error: error.message });
