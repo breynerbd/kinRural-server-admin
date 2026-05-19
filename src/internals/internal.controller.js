@@ -20,6 +20,7 @@ export const syncUserFromAuth = async (req, res) => {
         });
 
         if (!user) {
+
             user = await User.create({
                 auth_id,
                 nombre,
@@ -31,6 +32,20 @@ export const syncUserFromAuth = async (req, res) => {
                 ingresos_mensuales,
                 role_id
             });
+
+        } else {
+
+            await user.update({
+                nombre,
+                apellido,
+                correo,
+                dpi,
+                telefono,
+                direccion,
+                ingresos_mensuales,
+                role_id
+            });
+
         }
 
         return res.status(200).json({
