@@ -4,6 +4,20 @@ import { User } from "../users/user.model.js";
 
 export const createAccount = async (req, res) => {
     try {
+        const SALDO_MINIMO = 100; // Define aquí tu saldo mínimo requerido
+        
+        // Extraemos el saldo enviado por el cliente (asumiendo que se llama 'saldo' o 'balance')
+        const { saldo } = req.body;
+
+        // 1. Validamos que el usuario envíe un saldo y que cumpla con el mínimo
+        if (saldo === undefined || Number(saldo) < SALDO_MINIMO) {
+            return res.status(400).json({ 
+                success: false, 
+                message: `No se pudo crear la cuenta. El saldo inicial mínimo requerido es de ${SALDO_MINIMO}.` 
+            });
+        }
+
+        // 2. Si pasa la validación, generamos el número de cuenta aleatorio con nanoid
         const numero_cuenta = nanoid(10);
 
         const account = await Account.create({
