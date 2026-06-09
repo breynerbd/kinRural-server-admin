@@ -1,8 +1,14 @@
 import axios from "axios";
 import { User } from "./user.model.js";
 
+// ======================================================
+// CREATE USER
+// ======================================================
+
 export const createUser = async (req, res) => {
   try {
+    const currentUserRole = req.user?.role;
+
     const {
       nombre,
       apellido,
@@ -16,84 +22,33 @@ export const createUser = async (req, res) => {
       password,
     } = req.body;
 
-    // ========== VALIDACIONES ==========
-    if (!nombre?.trim()) {
-      return res
-        .status(400)
-        .json({ success: false, message: "El nombre es obligatorio." });
-    }
+    // ======================================================
+    // VALIDACIÓN DE ROLES
+    // ======================================================
 
-    if (!apellido?.trim()) {
-      return res
-        .status(400)
-        .json({ success: false, message: "El apellido es obligatorio." });
-    }
-
-    if (!dpi || !/^[0-9]{13}$/.test(dpi)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "El DPI debe tener 13 dígitos." });
-    }
-
-    if (await User.findOne({ where: { dpi } })) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Ya existe un usuario con ese DPI." });
-    }
-
-    if (!correo || !/^\S+@\S+\.\S+$/.test(correo)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Correo inválido." });
-    }
-
-    if (await User.findOne({ where: { correo } })) {
-      return res.status(400).json({
+    if (
+      currentUserRole === "ADMIN" &&
+      (role === "ADMIN" || role === "MASTER_ADMIN")
+    ) {
+      return res.status(403).json({
         success: false,
-        message: "Ya existe un usuario con ese correo.",
+        message: "No puedes crear administradores.",
       });
     }
 
-    if (!telefono?.toString().trim()) {
-      return res
-        .status(400)
-        .json({ success: false, message: "El teléfono es obligatorio." });
-    }
-
-    if (!direccion?.trim()) {
-      return res
-        .status(400)
-        .json({ success: false, message: "La dirección es obligatoria." });
-    }
-
-    if (!ingresos_mensuales || ingresos_mensuales < 100) {
-      return res.status(400).json({
+    if (role === "MASTER_ADMIN" && currentUserRole !== "MASTER_ADMIN") {
+      return res.status(403).json({
         success: false,
-        message: "Ingresos mínimos Q100.",
+        message: "No autorizado para crear MASTER_ADMIN.",
       });
     }
 
-    if (!role) {
-      return res
-        .status(400)
-        .json({ success: false, message: "El rol es obligatorio." });
-    }
+    // ======================================================
+    // AUTH SERVICE
+    // ======================================================
 
-    if (!username?.trim()) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Username obligatorio." });
-    }
-
-    if (!password || password.length < 8) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Password mínimo 8 caracteres." });
-    }
-
-    // ========== AUTH-SERVICE ==========
     const authResponse = await axios.post(
-      "http://host.docker.internal:5070/api/auth/register",
+      `${process.env.AUTH_SERVICE_URL}/api/auth/register`,
       {
         name: nombre,
         surname: apellido,
@@ -106,6 +61,11 @@ export const createUser = async (req, res) => {
         ingresosMensuales: ingresos_mensuales,
         role,
       },
+      {
+        headers: {
+          Authorization: req.headers.authorization,
+        },
+      },
     );
 
     const authUser = authResponse.data?.user;
@@ -117,9 +77,12 @@ export const createUser = async (req, res) => {
       });
     }
 
-    // ========== SOLO SINCRONIZACIÓN (NO CREAR AQUÍ USER) ==========
+    // ======================================================
+    // SYNC USER
+    // ======================================================
+
     const syncResponse = await axios.post(
-      "http://localhost:3005/kinrural/v1/internal/sync-user",
+      `${process.env.USER_SERVICE_URL}/kinrural/v1/internal/sync-user`,
       {
         auth_id: authUser.id,
         nombre,
@@ -156,7 +119,7 @@ export const createUser = async (req, res) => {
       message = data.title;
     }
 
-    console.error("❌ Error:", message);
+    console.error("❌ createUser:", data || error.message);
 
     return res.status(error.response?.status || 500).json({
       success: false,
@@ -165,39 +128,109 @@ export const createUser = async (req, res) => {
   }
 };
 
+// ======================================================
+// GET USERS
+// ======================================================
+
 export const getUsers = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
 
+    const currentUserRole = req.user?.role;
+
+    let whereCondition = {};
+
+    if (currentUserRole === "ADMIN") {
+      whereCondition = {
+        role: "USER",
+      };
+    }
+
+    const safeLimit = Math.min(parseInt(limit) || 10, 100);
+
     const { count, rows } = await User.findAndCountAll({
-      limit: parseInt(limit),
-      offset: (page - 1) * limit,
+      where: whereCondition,
+      limit: safeLimit,
+      offset: (page - 1) * safeLimit,
       order: [["createdAt", "DESC"]],
     });
 
-    res.json({
+    return res.json({
       success: true,
-      data: rows,
+      users: rows,
       pagination: {
         currentPage: parseInt(page),
-        totalPages: Math.ceil(count / limit),
+        totalPages: Math.ceil(count / safeLimit),
         totalRecords: count,
-        limit: parseInt(limit),
+        limit: safeLimit,
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("❌ getUsers:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
+// ======================================================
+// GET USER BY ID
+// ======================================================
+
+export const getUserById = async (req, res) => {
+  try {
+    const currentUserRole = req.user?.role;
+
+    const { id } = req.params;
+
+    const user = await User.findByPk(id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Usuario no encontrado.",
+      });
+    }
+
+    if (
+      currentUserRole === "ADMIN" &&
+      (user.role === "ADMIN" || user.role === "MASTER_ADMIN")
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "No autorizado.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      user,
+    });
+  } catch (error) {
+    console.error("❌ getUserById:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// ======================================================
+// UPDATE USER
+// ======================================================
+
 export const updateUser = async (req, res) => {
   try {
+    const currentUserRole = req.user?.role;
+
     const { id } = req.params;
 
     const {
       nombre,
       apellido,
-      dpi,
       correo,
       telefono,
       direccion,
@@ -214,12 +247,126 @@ export const updateUser = async (req, res) => {
       });
     }
 
-    // ========== SYNC AUTH-SERVICE ==========
-    await axios.put(
-      `http://host.docker.internal:5070/api/auth/users/${user.auth_id}/role`,
-      {
-        role,
-      },
+    if (
+      currentUserRole === "ADMIN" &&
+      (user.role === "ADMIN" || user.role === "MASTER_ADMIN")
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "No puedes editar administradores.",
+      });
+    }
+
+    if (
+      currentUserRole === "ADMIN" &&
+      (role === "ADMIN" || role === "MASTER_ADMIN")
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "No puedes asignar roles administrativos.",
+      });
+    }
+
+    if (role === "MASTER_ADMIN" && currentUserRole !== "MASTER_ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "No autorizado.",
+      });
+    }
+
+    // ======================================================
+    // AUTH SERVICE
+    // ======================================================
+
+    if (role) {
+      await axios.put(
+        `${process.env.AUTH_SERVICE_URL}/api/auth/users/${user.auth_id}/role`,
+        {
+          role,
+        },
+        {
+          headers: {
+            Authorization: req.headers.authorization,
+          },
+        },
+      );
+    }
+
+    // ======================================================
+    // UPDATE LOCAL DB
+    // ======================================================
+
+    const updateData = {};
+
+    if (nombre !== undefined) updateData.nombre = nombre;
+    if (apellido !== undefined) updateData.apellido = apellido;
+    if (correo !== undefined) updateData.correo = correo;
+    if (telefono !== undefined) updateData.telefono = telefono;
+    if (direccion !== undefined) updateData.direccion = direccion;
+    if (ingresos_mensuales !== undefined) {
+      updateData.ingresos_mensuales = ingresos_mensuales;
+    }
+    if (role !== undefined) updateData.role = role;
+
+    await user.update(updateData);
+
+    return res.json({
+      success: true,
+      user,
+    });
+  } catch (error) {
+    console.error("❌ updateUser:", error.response?.data || error.message);
+
+    return res.status(error.response?.status || 500).json({
+      success: false,
+      message: error.response?.data?.message || error.message,
+    });
+  }
+};
+
+// ======================================================
+// DELETE USER
+// ======================================================
+
+export const deleteUser = async (req, res) => {
+  try {
+    const currentUserRole = req.user?.role;
+    const currentUserId = req.user?.id;
+
+    const { id } = req.params;
+
+    const user = await User.findByPk(id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Usuario no encontrado.",
+      });
+    }
+
+    if (user.auth_id === currentUserId) {
+      return res.status(400).json({
+        success: false,
+        message: "No puedes eliminarte a ti mismo.",
+      });
+    }
+
+    if (
+      currentUserRole === "ADMIN" &&
+      (user.role === "ADMIN" || user.role === "MASTER_ADMIN")
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "No puedes eliminar administradores.",
+      });
+    }
+
+    // ======================================================
+    // DELETE AUTH USER
+    // ======================================================
+
+    await axios.delete(
+      `${process.env.AUTH_SERVICE_URL}/api/auth/users/${user.auth_id}`,
       {
         headers: {
           Authorization: req.headers.authorization,
@@ -227,66 +374,29 @@ export const updateUser = async (req, res) => {
       },
     );
 
-    // ========== UPDATE LOCAL DB ==========
-    await user.update({
-      nombre,
-      apellido,
-      dpi,
-      correo,
-      telefono,
-      direccion,
-      ingresos_mensuales,
-      role,
-    });
+    // ======================================================
+    // DELETE LOCAL USER
+    // ======================================================
 
-    res.json({
+    await user.destroy();
+
+    return res.json({
       success: true,
-      user,
+      message: "Usuario eliminado correctamente.",
     });
   } catch (error) {
-    console.error("❌ updateUser:", error.response?.data || error.message);
+    console.error("❌ deleteUser:", error);
 
-    res.status(500).json({
+    return res.status(error.response?.status || 500).json({
       success: false,
       message: error.response?.data?.message || error.message,
     });
   }
 };
 
-export const getUserById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const user = await User.findByPk(id);
-
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Usuario no encontrado." });
-    }
-
-    res.json({ success: true, user });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-export const deleteUser = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const user = await User.findByPk(id);
-
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Usuario no encontrado." });
-    }
-
-    await user.destroy();
-    res.json({ success: true, message: "Usuario eliminado correctamente." });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+// ======================================================
+// INTERNAL SYNC USER
+// ======================================================
 
 export const syncUser = async (req, res) => {
   try {
@@ -302,22 +412,6 @@ export const syncUser = async (req, res) => {
       role,
     } = req.body;
 
-    // ========== VALIDACIONES ==========
-    if (!auth_id) {
-      return res.status(400).json({
-        success: false,
-        message: "auth_id es obligatorio.",
-      });
-    }
-
-    if (!role) {
-      return res.status(400).json({
-        success: false,
-        message: "role es obligatorio.",
-      });
-    }
-
-    // ========== EVITAR DUPLICADOS ==========
     const existingUser = await User.findOne({
       where: {
         auth_id,
@@ -331,7 +425,6 @@ export const syncUser = async (req, res) => {
       });
     }
 
-    // ========== CREAR USUARIO ==========
     const user = await User.create({
       auth_id,
       nombre,
