@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import { dbConnection } from "./configs/db.js";
 import { initServer } from "./configs/app.js";
 import { setupAssociations } from "./src/associations.js";
-
+import "./src/exchange/exchange.router.js";
 import "./src/accounts/account.model.js";
 import "./src/transactions/transaction.model.js";
 import "./src/movements/movement.model.js";

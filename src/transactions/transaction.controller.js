@@ -8,30 +8,56 @@ import { User } from "../users/user.model.js";
 
 const LIMITE_DIARIO = 10000;
 
+// ======================================================
+// TRANSFER
+// ======================================================
+
 export const transfer = async (req, res) => {
   const t = await db.transaction();
+  const { cuenta_origen_id, cuenta_destino_id, monto } = req.body;
+  const montoNum = Number(monto);
 
   try {
-    const { cuenta_origen_id, cuenta_destino_id, monto } = req.body;
+    // ======================================================
+    // VALIDACIONES BÁSICAS
+    // ======================================================
 
-    if (monto <= 0) {
+    if (cuenta_origen_id === cuenta_destino_id) {
+      throw new Error("No puedes transferir a la misma cuenta");
+    }
+
+    if (montoNum <= 0) {
       throw new Error("Monto inválido");
     }
 
-    const cuentaOrigen = await Account.findByPk(cuenta_origen_id, {
-      transaction: t,
-    });
-    const cuentaDestino = await Account.findByPk(cuenta_destino_id, {
-      transaction: t,
-    });
+    // ======================================================
+    // OBTENER CUENTAS
+    // ======================================================
+
+    const [cuentaOrigen, cuentaDestino] = await Promise.all([
+      Account.findByPk(cuenta_origen_id, { transaction: t }),
+      Account.findByPk(cuenta_destino_id, { transaction: t }),
+    ]);
 
     if (!cuentaOrigen || !cuentaDestino) {
       throw new Error("Cuenta no encontrada");
     }
 
-    if (parseFloat(cuentaOrigen.saldo) < monto) {
-      throw new Error("Saldo insuficiente");
+    const saldoOrigen = Number(cuentaOrigen.saldo);
+
+    // ======================================================
+    // VALIDAR SALDO
+    // ======================================================
+
+    if (saldoOrigen < montoNum) {
+      throw new Error(
+        `Saldo insuficiente. Disponible: ${saldoOrigen}, requerido: ${montoNum}`,
+      );
     }
+
+    // ======================================================
+    // LÍMITE DIARIO
+    // ======================================================
 
     const hoy = new Date().toISOString().split("T")[0];
 
@@ -39,6 +65,7 @@ export const transfer = async (req, res) => {
       where: { fecha: hoy },
       transaction: t,
     });
+
     if (!limite) {
       limite = await DailyLimit.create(
         { fecha: hoy, total_transferido: 0 },
@@ -46,71 +73,98 @@ export const transfer = async (req, res) => {
       );
     }
 
-    if (parseFloat(limite.total_transferido) + monto > LIMITE_DIARIO) {
+    const nuevoTotal = Number(limite.total_transferido) + montoNum;
+
+    if (nuevoTotal > LIMITE_DIARIO) {
       throw new Error("Límite diario excedido");
     }
+
+    // ======================================================
+    // TRANSACCIÓN PRINCIPAL
+    // ======================================================
 
     const transaction = await Transaction.create(
       {
         tipo: "TRANSFERENCIA",
-        monto,
+        monto: montoNum,
         cuenta_origen_id,
         cuenta_destino_id,
       },
       { transaction: t },
     );
 
-    cuentaOrigen.saldo = parseFloat(cuentaOrigen.saldo) - monto;
-    cuentaDestino.saldo = parseFloat(cuentaDestino.saldo) + monto;
+    // ======================================================
+    // ACTUALIZAR SALDOS
+    // ======================================================
 
-    await cuentaOrigen.save({ transaction: t });
-    await cuentaDestino.save({ transaction: t });
+    cuentaOrigen.saldo = saldoOrigen - montoNum;
+    cuentaDestino.saldo = Number(cuentaDestino.saldo) + montoNum;
 
-    await Movement.create(
-      {
-        tipo_operacion: "TRANSFERENCIA",
-        tipo_movimiento: "DEBITO",
-        monto,
-        transaction_id: transaction.id,
-        account_id: cuentaOrigen.id,
-      },
+    await Promise.all([
+      cuentaOrigen.save({ transaction: t }),
+      cuentaDestino.save({ transaction: t }),
+    ]);
+
+    // ======================================================
+    // MOVIMIENTOS
+    // ======================================================
+
+    await Movement.bulkCreate(
+      [
+        {
+          tipo_operacion: "TRANSFERENCIA",
+          tipo_movimiento: "DEBITO",
+          monto: montoNum,
+          transaction_id: transaction.id,
+          account_id: cuentaOrigen.id,
+        },
+        {
+          tipo_operacion: "TRANSFERENCIA",
+          tipo_movimiento: "CREDITO",
+          monto: montoNum,
+          transaction_id: transaction.id,
+          account_id: cuentaDestino.id,
+        },
+      ],
       { transaction: t },
     );
 
-    await Movement.create(
-      {
-        tipo_operacion: "TRANSFERENCIA",
-        tipo_movimiento: "CREDITO",
-        monto,
-        transaction_id: transaction.id,
-        account_id: cuentaDestino.id,
-      },
-      { transaction: t },
-    );
+    // ======================================================
+    // ACTUALIZAR LÍMITE
+    // ======================================================
 
-    limite.total_transferido = parseFloat(limite.total_transferido) + monto;
+    limite.total_transferido = nuevoTotal;
     await limite.save({ transaction: t });
 
     await t.commit();
 
-    res.status(200).json({
+    return res.status(200).json({
+      success: true,
       message: "Transferencia exitosa",
       transaction,
     });
   } catch (error) {
-    await t.rollback();
+    if (!t.finished) {
+      await t.rollback();
+    }
 
     await Reversal.create({
       motivo: error.message,
-      estado: "COMPLETADO",
+      cuenta_origen_id,
+      cuenta_destino_id,
+      monto: montoNum,
     });
 
-    res.status(400).json({
-      message: "Error en transferencia",
-      error: error.message,
+    return res.status(400).json({
+      success: false,
+      message: error.message,
     });
   }
 };
+
+// ======================================================
+// GET ALL TRANSACTIONS
+// ======================================================
 
 export const getAllTransactions = async (req, res) => {
   try {
@@ -143,14 +197,22 @@ export const getAllTransactions = async (req, res) => {
       ],
     });
 
-    res.status(200).json(transactions);
+    return res.status(200).json({
+      success: true,
+      transactions,
+    });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
+      success: false,
       message: "Error al obtener las transacciones",
       error: error.message,
     });
   }
 };
+
+// ======================================================
+// GET TRANSACTIONS BY ACCOUNT ID
+// ======================================================
 
 export const getTransactionByIdAccount = async (req, res) => {
   try {
@@ -160,7 +222,6 @@ export const getTransactionByIdAccount = async (req, res) => {
       where: {
         cuenta_origen_id: id,
       },
-
       include: [
         {
           model: Account,
@@ -174,7 +235,6 @@ export const getTransactionByIdAccount = async (req, res) => {
             },
           ],
         },
-
         {
           model: Account,
           as: "cuenta_destino",
@@ -190,11 +250,13 @@ export const getTransactionByIdAccount = async (req, res) => {
       ],
     });
 
-    res.status(200).json(transactions);
+    return res.status(200).json({
+      success: true,
+      data: transactions,
+    });
   } catch (error) {
-    console.log(error);
-
-    res.status(500).json({
+    return res.status(500).json({
+      success: false,
       message: "Error al obtener las transacciones",
       error: error.message,
     });

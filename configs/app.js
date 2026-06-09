@@ -16,6 +16,7 @@ import { loanRouter } from "../src/loans/loan.router.js";
 import { cardRouter } from "../src/cards/card.router.js";
 import { accountRequestRouter } from "../src/accountsRequest/accountRequest.router.js";
 import { internalRouter } from "../src/internals/internal.router.js";
+import { exchangeRouter } from "../src/exchange/exchange.router.js";
 
 const BASE_URL = "/kinrural/v1";
 
@@ -38,6 +39,7 @@ export const initServer = () => {
   app.use(`${BASE_URL}/cards`, cardRouter);
   app.use(`${BASE_URL}/account-requests`, accountRequestRouter);
   app.use(`${BASE_URL}/internal`, internalRouter);
+  app.use(`${BASE_URL}/exchange`, exchangeRouter);
 
   app.get(`${BASE_URL}/health`, (req, res) => {
     res.status(200).json({
