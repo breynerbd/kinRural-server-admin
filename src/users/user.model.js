@@ -5,7 +5,7 @@ export const User = db.define(
   "user",
   {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    auth_id: { type: DataTypes.STRING, unique: true },
+    auth_id: { type: DataTypes.STRING, allowNull: false, unique: true },
     nombre: { type: DataTypes.STRING, allowNull: false },
     apellido: { type: DataTypes.STRING, allowNull: false },
     dpi: { type: DataTypes.STRING, allowNull: true, unique: true },

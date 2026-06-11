@@ -1,5 +1,11 @@
 import axios from "axios";
 import { User } from "./user.model.js";
+import {
+  canAssignRole,
+  canManageUser,
+  canDeleteUser,
+} from "./user.permissions.js";
+import { Op } from "sequelize";
 
 // ======================================================
 // CREATE USER
@@ -26,20 +32,10 @@ export const createUser = async (req, res) => {
     // VALIDACIÓN DE ROLES
     // ======================================================
 
-    if (
-      currentUserRole === "ADMIN" &&
-      (role === "ADMIN" || role === "MASTER_ADMIN")
-    ) {
+    if (!canAssignRole(currentUserRole, role)) {
       return res.status(403).json({
         success: false,
-        message: "No puedes crear administradores.",
-      });
-    }
-
-    if (role === "MASTER_ADMIN" && currentUserRole !== "MASTER_ADMIN") {
-      return res.status(403).json({
-        success: false,
-        message: "No autorizado para crear MASTER_ADMIN.",
+        message: "No autorizado",
       });
     }
 
@@ -96,28 +92,18 @@ export const createUser = async (req, res) => {
       },
     );
 
-    const user = syncResponse.data?.user;
-
     return res.status(201).json({
       success: true,
       message: "Usuario creado correctamente.",
-      user,
+      user: syncResponse.data?.user,
     });
   } catch (error) {
     const data = error.response?.data;
 
     let message = "Error al crear usuario.";
 
-    if (data?.errors) {
-      const firstField = Object.values(data.errors)[0];
-      message = Array.isArray(firstField) ? firstField[0] : firstField;
-    } else if (data?.message) {
-      message = data.message;
-    } else if (data?.error) {
-      message = data.error;
-    } else if (data?.title) {
-      message = data.title;
-    }
+    if (data?.message) message = data.message;
+    if (data?.error) message = data.error;
 
     console.error("❌ createUser:", data || error.message);
 
@@ -140,10 +126,11 @@ export const getUsers = async (req, res) => {
 
     let whereCondition = {};
 
-    if (currentUserRole === "ADMIN") {
-      whereCondition = {
-        role: "USER",
-      };
+    if (currentUserRole === "USER") {
+      return res.status(403).json({
+        success: false,
+        message: "No autorizado",
+      });
     }
 
     const safeLimit = Math.min(parseInt(limit) || 10, 100);
@@ -194,13 +181,10 @@ export const getUserById = async (req, res) => {
       });
     }
 
-    if (
-      currentUserRole === "ADMIN" &&
-      (user.role === "ADMIN" || user.role === "MASTER_ADMIN")
-    ) {
+    if (!canManageUser(currentUserRole, user.role)) {
       return res.status(403).json({
         success: false,
-        message: "No autorizado.",
+        message: "No autorizado",
       });
     }
 
@@ -247,30 +231,17 @@ export const updateUser = async (req, res) => {
       });
     }
 
-    if (
-      currentUserRole === "ADMIN" &&
-      (user.role === "ADMIN" || user.role === "MASTER_ADMIN")
-    ) {
+    if (!canManageUser(currentUserRole, user.role)) {
       return res.status(403).json({
         success: false,
-        message: "No puedes editar administradores.",
+        message: "No autorizado",
       });
     }
 
-    if (
-      currentUserRole === "ADMIN" &&
-      (role === "ADMIN" || role === "MASTER_ADMIN")
-    ) {
+    if (role && !canAssignRole(currentUserRole, role)) {
       return res.status(403).json({
         success: false,
-        message: "No puedes asignar roles administrativos.",
-      });
-    }
-
-    if (role === "MASTER_ADMIN" && currentUserRole !== "MASTER_ADMIN") {
-      return res.status(403).json({
-        success: false,
-        message: "No autorizado.",
+        message: "No autorizado",
       });
     }
 
@@ -331,7 +302,7 @@ export const updateUser = async (req, res) => {
 export const deleteUser = async (req, res) => {
   try {
     const currentUserRole = req.user?.role;
-    const currentUserId = req.user?.id;
+    const currentUserAuthId = req.user?.auth_id;
 
     const { id } = req.params;
 
@@ -344,20 +315,10 @@ export const deleteUser = async (req, res) => {
       });
     }
 
-    if (user.auth_id === currentUserId) {
-      return res.status(400).json({
-        success: false,
-        message: "No puedes eliminarte a ti mismo.",
-      });
-    }
-
-    if (
-      currentUserRole === "ADMIN" &&
-      (user.role === "ADMIN" || user.role === "MASTER_ADMIN")
-    ) {
+    if (!canDeleteUser(currentUserRole, req.user?.auth_id, user)) {
       return res.status(403).json({
         success: false,
-        message: "No puedes eliminar administradores.",
+        message: "No autorizado",
       });
     }
 
@@ -414,7 +375,7 @@ export const syncUser = async (req, res) => {
 
     const existingUser = await User.findOne({
       where: {
-        auth_id,
+        [Op.or]: [{ auth_id }, { correo }, { dpi }],
       },
     });
 

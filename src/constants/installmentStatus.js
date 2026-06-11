@@ -1,0 +1,5 @@
+export const INSTALLMENT_STATUS = {
+  PENDING: "PENDIENTE",
+  PAID: "PAGADA",
+  DELINQUENT: "EN_MORA",
+};

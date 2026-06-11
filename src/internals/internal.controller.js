@@ -1,4 +1,5 @@
 import { User } from "../users/user.model.js";
+import { ROLES } from "../constants/roles.js";
 
 export const syncUserFromAuth = async (req, res) => {
   try {
@@ -14,6 +15,17 @@ export const syncUserFromAuth = async (req, res) => {
       role,
     } = req.body;
 
+    if (!auth_id || !correo) {
+      return res.status(400).json({
+        success: false,
+        message: "auth_id y correo son obligatorios",
+      });
+    }
+
+    const allowedRoles = Object.values(ROLES);
+
+    const safeRole = allowedRoles.includes(role) ? role : ROLES.USER;
+
     let user = await User.findOne({
       where: { auth_id },
     });
@@ -28,7 +40,7 @@ export const syncUserFromAuth = async (req, res) => {
         telefono,
         direccion,
         ingresos_mensuales,
-        role,
+        role: safeRole,
       });
     } else {
       await user.update({
@@ -39,8 +51,10 @@ export const syncUserFromAuth = async (req, res) => {
         telefono,
         direccion,
         ingresos_mensuales,
-        role,
+        role: safeRole,
       });
+
+      await user.reload();
     }
 
     return res.status(200).json({

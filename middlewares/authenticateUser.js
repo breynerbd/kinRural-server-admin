@@ -11,13 +11,13 @@ export const authenticateUser = (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.user = {
-      id: decoded.sub,
+    req.user = Object.freeze({
+      auth_id: decoded.sub,
       email: decoded.email,
       role:
         decoded.role ||
         decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"],
-    };
+    });
 
     next();
   } catch (error) {

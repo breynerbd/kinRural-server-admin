@@ -1,25 +1,37 @@
 import { Router } from "express";
 import {
-    getAllRequests,
-    approveRequest,
-    rejectRequest
+  getAllRequests,
+  approveRequest,
+  rejectRequest,
 } from "./accountRequest.controller.js";
 
-import {
-    validateAccountRequestId,
-    validateCreateAccountRequest
-} from "../../middlewares/accountRequest-validators.js";
+import { validateAccountRequestId } from "../../middlewares/accountRequest-validators.js";
+
+import { authenticateUser } from "../../middlewares/authenticateUser.js";
+import { authorizeRoles } from "../../middlewares/authorizeRoles.js";
+import { ROLES } from "../constants/roles.js";
 
 export const accountRequestRouter = Router();
 
-// Listar solicitudes
-accountRequestRouter.get("/", getAllRequests);
+accountRequestRouter.get(
+  "/",
+  authenticateUser,
+  authorizeRoles(ROLES.ADMIN, ROLES.MASTER_ADMIN),
+  getAllRequests,
+);
 
-// Aprobar solicitud
-accountRequestRouter.patch("/:id/approve", validateAccountRequestId, approveRequest);
+accountRequestRouter.patch(
+  "/:id/approve",
+  authenticateUser,
+  authorizeRoles(ROLES.ADMIN, ROLES.MASTER_ADMIN),
+  validateAccountRequestId,
+  approveRequest,
+);
 
-// Rechazar solicitud
-accountRequestRouter.patch("/:id/reject", validateAccountRequestId, rejectRequest);
-
-// (Opcional) Si agregas endpoint para crear solicitud
-// accountRequestRouter.post("/", validateCreateAccountRequest, createAccountRequest);
+accountRequestRouter.patch(
+  "/:id/reject",
+  authenticateUser,
+  authorizeRoles(ROLES.ADMIN, ROLES.MASTER_ADMIN),
+  validateAccountRequestId,
+  rejectRequest,
+);

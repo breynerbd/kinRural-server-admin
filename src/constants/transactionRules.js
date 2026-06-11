@@ -1,0 +1,3 @@
+export const TRANSACTION_RULES = {
+  DAILY_TRANSFER_LIMIT: 10000,
+};

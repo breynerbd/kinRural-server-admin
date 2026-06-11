@@ -1,0 +1,9 @@
+import { ROLES } from "../src/constants/roles.js";
+
+export const PERMISSIONS = {
+  MANAGE_USERS: [ROLES.MASTER_ADMIN, ROLES.ADMIN],
+
+  MANAGE_ADMINS: [ROLES.MASTER_ADMIN],
+
+  VIEW_USERS: [ROLES.MASTER_ADMIN, ROLES.ADMIN],
+};

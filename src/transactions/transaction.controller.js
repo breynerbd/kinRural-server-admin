@@ -1,4 +1,6 @@
+import { Op } from "sequelize";
 import { db } from "../../configs/db.js";
+
 import { Transaction } from "./transaction.model.js";
 import { Account } from "../accounts/account.model.js";
 import { Movement } from "../movements/movement.model.js";
@@ -6,7 +8,10 @@ import { DailyLimit } from "../dailyLimit/dailyLimit.model.js";
 import { Reversal } from "../reversals/reversal.model.js";
 import { User } from "../users/user.model.js";
 
-const LIMITE_DIARIO = 10000;
+import { TRANSACTION_RULES } from "../constants/transactionRules.js";
+import { TRANSACTION_TYPES } from "../constants/transactionTypes.js";
+import { MOVEMENT_TYPES } from "../constants/movementTypes.js";
+import { Transaction as SequelizeTransaction } from "sequelize";
 
 // ======================================================
 // TRANSFER
@@ -14,8 +19,12 @@ const LIMITE_DIARIO = 10000;
 
 export const transfer = async (req, res) => {
   const t = await db.transaction();
+
   const { cuenta_origen_id, cuenta_destino_id, monto } = req.body;
+
   const montoNum = Number(monto);
+
+  let transactionCreated = null;
 
   try {
     // ======================================================
@@ -26,17 +35,23 @@ export const transfer = async (req, res) => {
       throw new Error("No puedes transferir a la misma cuenta");
     }
 
-    if (montoNum <= 0) {
+    if (Number.isNaN(montoNum) || montoNum <= 0) {
       throw new Error("Monto inválido");
     }
 
     // ======================================================
-    // OBTENER CUENTAS
+    // OBTENER CUENTAS CON BLOQUEO
     // ======================================================
 
     const [cuentaOrigen, cuentaDestino] = await Promise.all([
-      Account.findByPk(cuenta_origen_id, { transaction: t }),
-      Account.findByPk(cuenta_destino_id, { transaction: t }),
+      Account.findByPk(cuenta_origen_id, {
+        transaction: t,
+        lock: SequelizeTransaction.LOCK.UPDATE,
+      }),
+      Account.findByPk(cuenta_destino_id, {
+        transaction: t,
+        lock: SequelizeTransaction.LOCK.UPDATE,
+      }),
     ]);
 
     if (!cuentaOrigen || !cuentaDestino) {
@@ -64,33 +79,41 @@ export const transfer = async (req, res) => {
     let limite = await DailyLimit.findOne({
       where: { fecha: hoy },
       transaction: t,
+      lock: SequelizeTransaction.LOCK.UPDATE,
     });
 
     if (!limite) {
       limite = await DailyLimit.create(
-        { fecha: hoy, total_transferido: 0 },
-        { transaction: t },
+        {
+          fecha: hoy,
+          total_transferido: 0,
+        },
+        {
+          transaction: t,
+        },
       );
     }
 
     const nuevoTotal = Number(limite.total_transferido) + montoNum;
 
-    if (nuevoTotal > LIMITE_DIARIO) {
+    if (nuevoTotal > TRANSACTION_RULES.DAILY_TRANSFER_LIMIT) {
       throw new Error("Límite diario excedido");
     }
 
     // ======================================================
-    // TRANSACCIÓN PRINCIPAL
+    // CREAR TRANSACCIÓN
     // ======================================================
 
-    const transaction = await Transaction.create(
+    transactionCreated = await Transaction.create(
       {
-        tipo: "TRANSFERENCIA",
+        tipo: TRANSACTION_TYPES.TRANSFER,
         monto: montoNum,
         cuenta_origen_id,
         cuenta_destino_id,
       },
-      { transaction: t },
+      {
+        transaction: t,
+      },
     );
 
     // ======================================================
@@ -98,6 +121,7 @@ export const transfer = async (req, res) => {
     // ======================================================
 
     cuentaOrigen.saldo = saldoOrigen - montoNum;
+
     cuentaDestino.saldo = Number(cuentaDestino.saldo) + montoNum;
 
     await Promise.all([
@@ -106,27 +130,29 @@ export const transfer = async (req, res) => {
     ]);
 
     // ======================================================
-    // MOVIMIENTOS
+    // CREAR MOVIMIENTOS
     // ======================================================
 
     await Movement.bulkCreate(
       [
         {
-          tipo_operacion: "TRANSFERENCIA",
-          tipo_movimiento: "DEBITO",
+          tipo_operacion: TRANSACTION_TYPES.TRANSFER,
+          tipo_movimiento: MOVEMENT_TYPES.DEBIT,
           monto: montoNum,
-          transaction_id: transaction.id,
+          transaction_id: transactionCreated.id,
           account_id: cuentaOrigen.id,
         },
         {
-          tipo_operacion: "TRANSFERENCIA",
-          tipo_movimiento: "CREDITO",
+          tipo_operacion: TRANSACTION_TYPES.TRANSFER,
+          tipo_movimiento: MOVEMENT_TYPES.CREDIT,
           monto: montoNum,
-          transaction_id: transaction.id,
+          transaction_id: transactionCreated.id,
           account_id: cuentaDestino.id,
         },
       ],
-      { transaction: t },
+      {
+        transaction: t,
+      },
     );
 
     // ======================================================
@@ -134,26 +160,39 @@ export const transfer = async (req, res) => {
     // ======================================================
 
     limite.total_transferido = nuevoTotal;
-    await limite.save({ transaction: t });
+
+    await limite.save({
+      transaction: t,
+    });
 
     await t.commit();
 
     return res.status(200).json({
       success: true,
       message: "Transferencia exitosa",
-      transaction,
+      transaction: transactionCreated,
     });
   } catch (error) {
     if (!t.finished) {
       await t.rollback();
     }
 
-    await Reversal.create({
-      motivo: error.message,
-      cuenta_origen_id,
-      cuenta_destino_id,
-      monto: montoNum,
-    });
+    // ======================================================
+    // REGISTRAR REVERSIÓN SOLO SI EXISTIÓ TRANSACCIÓN
+    // ======================================================
+
+    if (transactionCreated) {
+      try {
+        await Reversal.create({
+          motivo: error.message,
+          cuenta_origen_id,
+          cuenta_destino_id,
+          monto: montoNum,
+        });
+      } catch (reversalError) {
+        console.error("Error al registrar reversión:", reversalError);
+      }
+    }
 
     return res.status(400).json({
       success: false,
@@ -195,6 +234,7 @@ export const getAllTransactions = async (req, res) => {
           ],
         },
       ],
+      order: [["createdAt", "DESC"]],
     });
 
     return res.status(200).json({
@@ -218,9 +258,25 @@ export const getTransactionByIdAccount = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const account = await Account.findByPk(id);
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: "Cuenta no encontrada",
+      });
+    }
+
     const transactions = await Transaction.findAll({
       where: {
-        cuenta_origen_id: id,
+        [Op.or]: [
+          {
+            cuenta_origen_id: id,
+          },
+          {
+            cuenta_destino_id: id,
+          },
+        ],
       },
       include: [
         {
@@ -248,6 +304,7 @@ export const getTransactionByIdAccount = async (req, res) => {
           ],
         },
       ],
+      order: [["createdAt", "DESC"]],
     });
 
     return res.status(200).json({

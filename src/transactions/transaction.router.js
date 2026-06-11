@@ -6,33 +6,30 @@ import {
 } from "./transaction.controller.js";
 
 import { authenticateUser } from "../../middlewares/authenticateUser.js";
+import { authorizeRoles } from "../../middlewares/authorizeRoles.js";
 import { validateCreateTransaction } from "../../middlewares/transaction-validators.js";
+import { ROLES } from "../constants/roles.js";
 
 export const transactionRouter = Router();
 
-// ======================================================
-// GET ALL TRANSACTIONS
-// ======================================================
-
-transactionRouter.get("/", authenticateUser, getAllTransactions);
-
-// ======================================================
-// CREATE TRANSFER
-// ======================================================
+transactionRouter.get(
+  "/",
+  authenticateUser,
+  authorizeRoles(ROLES.ADMIN, ROLES.MASTER_ADMIN),
+  getAllTransactions,
+);
 
 transactionRouter.post(
   "/",
   authenticateUser,
+  authorizeRoles(ROLES.ADMIN, ROLES.MASTER_ADMIN),
   validateCreateTransaction,
   transfer,
 );
 
-// ======================================================
-// GET TRANSACTIONS BY ACCOUNT ID
-// ======================================================
-
 transactionRouter.get(
   "/account/:id",
   authenticateUser,
+  authorizeRoles(ROLES.ADMIN, ROLES.MASTER_ADMIN),
   getTransactionByIdAccount,
 );
