@@ -133,26 +133,27 @@ export const transfer = async (req, res) => {
     // CREAR MOVIMIENTOS
     // ======================================================
 
+    const esEgreso = (op) =>
+      ["TRANSFERENCIA", "RETIRO", "PAGO_PRESTAMO"].includes(op);
+
     await Movement.bulkCreate(
       [
         {
           tipo_operacion: TRANSACTION_TYPES.TRANSFER,
-          tipo_movimiento: MOVEMENT_TYPES.DEBIT,
+          tipo_movimiento: "DEBITO", // origen siempre egresa
           monto: montoNum,
           transaction_id: transactionCreated.id,
           account_id: cuentaOrigen.id,
         },
         {
           tipo_operacion: TRANSACTION_TYPES.TRANSFER,
-          tipo_movimiento: MOVEMENT_TYPES.CREDIT,
+          tipo_movimiento: "CREDITO", // destino siempre ingresa
           monto: montoNum,
           transaction_id: transactionCreated.id,
           account_id: cuentaDestino.id,
         },
       ],
-      {
-        transaction: t,
-      },
+      { transaction: t },
     );
 
     // ======================================================
@@ -317,5 +318,178 @@ export const getTransactionByIdAccount = async (req, res) => {
       message: "Error al obtener las transacciones",
       error: error.message,
     });
+  }
+};
+
+// ======================================================
+// DEPOSIT
+// ======================================================
+
+export const deposit = async (req, res) => {
+  const t = await db.transaction();
+  const { cuenta_destino_id, monto } = req.body;
+  const montoNum = Number(monto);
+  let transactionCreated = null;
+
+  try {
+    if (Number.isNaN(montoNum) || montoNum <= 0) {
+      throw new Error("Monto inválido para depósito");
+    }
+
+    // Obtener y bloquear la cuenta destino para asegurar atomicidad
+    const cuentaDestino = await Account.findByPk(cuenta_destino_id, {
+      transaction: t,
+      lock: SequelizeTransaction.LOCK.UPDATE,
+    });
+
+    if (!cuentaDestino) {
+      throw new Error("Cuenta destino no encontrada");
+    }
+
+    // Crear la transacción base
+    transactionCreated = await Transaction.create(
+      {
+        tipo: TRANSACTION_TYPES.DEPOSIT,
+        monto: montoNum,
+        cuenta_origen_id: null, // No aplica origen en depósito en efectivo/caja
+        cuenta_destino_id,
+      },
+      { transaction: t },
+    );
+
+    // Actualizar saldo (Crédito)
+    cuentaDestino.saldo = Number(cuentaDestino.saldo) + montoNum;
+    await cuentaDestino.save({ transaction: t });
+
+    // Generar Movimiento Contable
+    const esEgreso = ["RETIRO", "TRANSFERENCIA", "PAGO_PRESTAMO"].includes(
+      TRANSACTION_TYPES.DEPOSIT,
+    );
+
+    await Movement.create(
+      {
+        tipo_operacion: TRANSACTION_TYPES.DEPOSIT,
+        tipo_movimiento: esEgreso ? "DEBITO" : "CREDITO",
+        monto: montoNum,
+        transaction_id: transactionCreated.id,
+        account_id: cuentaDestino.id,
+      },
+      { transaction: t },
+    );
+
+    await t.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Depósito realizado con éxito",
+      transaction: transactionCreated,
+    });
+  } catch (error) {
+    if (!t.finished) await t.rollback();
+
+    if (transactionCreated) {
+      try {
+        await Reversal.create({
+          motivo: `FALLO DEPOSITO: ${error.message}`,
+          cuenta_origen_id: null,
+          cuenta_destino_id,
+          monto: montoNum,
+        });
+      } catch (revErr) {
+        console.error("Error al revertir depósito:", revErr);
+      }
+    }
+
+    return res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+// ======================================================
+// WITHDRAWAL
+// ======================================================
+
+export const withdraw = async (req, res) => {
+  const t = await db.transaction();
+  const { cuenta_origen_id, monto } = req.body;
+  const montoNum = Number(monto);
+  let transactionCreated = null;
+
+  try {
+    if (Number.isNaN(montoNum) || montoNum <= 0) {
+      throw new Error("Monto inválido para retiro");
+    }
+
+    // Obtener y bloquear la cuenta origen
+    const cuentaOrigen = await Account.findByPk(cuenta_origen_id, {
+      transaction: t,
+      lock: SequelizeTransaction.LOCK.UPDATE,
+    });
+
+    if (!cuentaOrigen) {
+      throw new Error("Cuenta de origen no encontrada");
+    }
+
+    const saldoActual = Number(cuentaOrigen.saldo);
+    if (saldoActual < montoNum) {
+      throw new Error(
+        `Saldo insuficiente para el retiro. Disponible: Q${saldoActual}`,
+      );
+    }
+
+    // Crear la transacción base
+    transactionCreated = await Transaction.create(
+      {
+        tipo: TRANSACTION_TYPES.WITHDRAWAL,
+        monto: montoNum,
+        cuenta_origen_id,
+        cuenta_destino_id: null, // No aplica destino en retiro en efectivo
+      },
+      { transaction: t },
+    );
+
+    // Actualizar saldo (Débito)
+    cuentaOrigen.saldo = saldoActual - montoNum;
+    await cuentaOrigen.save({ transaction: t });
+
+    // Generar Movimiento Contable
+    const esEgreso = ["RETIRO", "TRANSFERENCIA", "PAGO_PRESTAMO"].includes(
+      TRANSACTION_TYPES.WITHDRAWAL,
+    );
+
+    await Movement.create(
+      {
+        tipo_operacion: TRANSACTION_TYPES.WITHDRAWAL,
+        tipo_movimiento: esEgreso ? "DEBITO" : "CREDITO",
+        monto: montoNum,
+        transaction_id: transactionCreated.id,
+        account_id: cuentaOrigen.id,
+      },
+      { transaction: t },
+    );
+
+    await t.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Retiro realizado con éxito",
+      transaction: transactionCreated,
+    });
+  } catch (error) {
+    if (!t.finished) await t.rollback();
+
+    if (transactionCreated) {
+      try {
+        await Reversal.create({
+          motivo: `FALLO RETIRO: ${error.message}`,
+          cuenta_origen_id,
+          cuenta_destino_id: null,
+          monto: montoNum,
+        });
+      } catch (revErr) {
+        console.error("Error al revertir retiro:", revErr);
+      }
+    }
+
+    return res.status(400).json({ success: false, message: error.message });
   }
 };

@@ -103,7 +103,8 @@ export const approveLoan = async (req, res) => {
     await Movement.create(
       {
         tipo_operacion: LOAN_RULES.OPERATION_TYPES.DEPOSIT,
-        tipo_movimiento: LOAN_RULES.MOVEMENT_TYPES.CREDIT,
+        // Usamos una lógica similar: los depósitos son siempre CRÉDITOS
+        tipo_movimiento: "CREDITO",
         monto: loan.monto,
         transaction_id: transaction.id,
         account_id: account.id,
@@ -199,11 +200,15 @@ export const payInstallment = async (req, res) => {
       { transaction: t },
     );
 
-    // 6. Movimiento
+    // 6. Movimiento (Lógica dinámica calculada)
+    const esEgreso = ["PAGO_PRESTAMO", "RETIRO", "TRANSFERENCIA"].includes(
+      LOAN_RULES.OPERATION_TYPES.LOAN_PAYMENT,
+    );
+
     await Movement.create(
       {
         tipo_operacion: LOAN_RULES.OPERATION_TYPES.LOAN_PAYMENT,
-        tipo_movimiento: LOAN_RULES.MOVEMENT_TYPES.DEBIT,
+        tipo_movimiento: esEgreso ? "DEBITO" : "CREDITO", // Calculado dinámicamente
         monto: totalPago,
         transaction_id: transaction.id,
         account_id: account.id,
