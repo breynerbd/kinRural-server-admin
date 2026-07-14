@@ -17,7 +17,6 @@
 - [Instalación y Configuración](#-instalación-y-configuración)
 - [Panel Administrativo (Admin API)](#️-panel-administrativo-admin-api)
   - [Usuarios](#-usuarios)
-  - [Roles](#-roles)
   - [Cuentas](#-cuentas)
   - [Solicitudes de Cuenta](#-solicitudes-de-cuenta)
   - [Préstamos](#-préstamos)
@@ -27,54 +26,14 @@
 
 ---
 
-## 🚀 Instalación y Configuración
+## Configuración
 
-### 1. Crear carpeta principal
+Antes de ejecutar el proyecto, completa los siguientes valores:
 
-```bash
-mkdir kinrural
-cd kinrural
-```
+## `kinRural-server-admin/.env`
 
-### 2. Clonar repositorios
-
-```bash
-# Servidor Admin
-git clone https://github.com/breynerbd/kinRural-server-admin.git kinRural-server-admin
-
-# Servidor User
-git clone https://github.com/breynerbd/kinRural-server-user.git kinRural-server-user
-```
-
-### 3. Instalar dependencias
-
-**📱 User Service**
-
-```bash
-cd ./kinRural-server-user/
-npm install
-```
-
-**🛠️ Admin Service**
-
-```bash
-cd ../kinRural-server-admin/
-npm install
-```
-
-### 4. Levantar contenedor Docker
-
-```bash
-docker compose up --build
-```
-
-> ✅ Esto levantará automáticamente:
->
-> - API Admin
-> - API User
-> - Base de datos
->
-> Todo dentro de contenedores Docker.
+- **EXCHANGE_API_KEY**
+- **JWT_SECRET**
 
 ---
 
@@ -119,24 +78,6 @@ http://localhost:3005/kinrural/v1
 {
   "nombre": "Andy",
   "correo": "am@gmail.com"
-}
-```
-
----
-
-### 🔐 Roles
-
-| Método   | Endpoint     | Descripción  | Auth  | Body           |
-| -------- | ------------ | ------------ | ----- | -------------- |
-| `POST`   | `/roles`     | Crear rol    | Admin | `{ "nombre" }` |
-| `GET`    | `/roles`     | Listar roles | Admin | —              |
-| `DELETE` | `/roles/:id` | Eliminar rol | Admin | —              |
-
-**Ejemplo — Crear rol (`POST /roles`):**
-
-```json
-{
-  "nombre": "ADMIN"
 }
 ```
 

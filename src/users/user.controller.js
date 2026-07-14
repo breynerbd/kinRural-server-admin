@@ -40,7 +40,8 @@ export const createUser = async (req, res) => {
     }
 
     // ======================================================
-    // AUTH SERVICE
+    // AUTH SERVICE (crea el usuario y dispara la sincronización
+    // local vía /internal/sync-user)
     // ======================================================
 
     const authResponse = await axios.post(
@@ -74,42 +75,39 @@ export const createUser = async (req, res) => {
     }
 
     // ======================================================
-    // SYNC USER
+    // OBTENER EL USUARIO YA SINCRONIZADO
+    // (lo crea internamente el Auth Service vía /internal/sync-user,
+    // aquí solo lo leemos para devolverlo al frontend)
     // ======================================================
 
-    const syncResponse = await axios.post(
-      `${process.env.USER_SERVICE_URL}/kinrural/v1/internal/sync-user`,
-      {
-        auth_id: authUser.id,
-        nombre,
-        apellido,
-        dpi,
-        correo,
-        telefono,
-        direccion,
-        ingresos_mensuales,
-        role,
-      },
-    );
+    const user = await User.findOne({
+      where: { auth_id: authUser.id },
+    });
+
+    if (!user) {
+      return res.status(500).json({
+        success: false,
+        message:
+          "El usuario se creó en Auth-Service pero no se sincronizó localmente.",
+      });
+    }
 
     return res.status(201).json({
       success: true,
       message: "Usuario creado correctamente.",
-      user: syncResponse.data?.user,
+      user,
     });
   } catch (error) {
-    const data = error.response?.data;
-
-    let message = "Error al crear usuario.";
-
-    if (data?.message) message = data.message;
-    if (data?.error) message = data.error;
-
-    console.error("❌ createUser:", data || error.message);
+    console.error("========== CREATE USER ERROR ==========");
+    console.error("MESSAGE:", error.message);
+    console.error("RESPONSE STATUS:", error.response?.status);
+    console.error("RESPONSE DATA:", error.response?.data);
+    console.error("=========================================");
 
     return res.status(error.response?.status || 500).json({
       success: false,
-      message,
+      message:
+        error.response?.data?.message || error.message || "Error interno",
     });
   }
 };

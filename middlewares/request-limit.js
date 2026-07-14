@@ -1,23 +1,23 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit from "express-rate-limit";
 
 export const requestLimit = rateLimit({
-    windowMs: 5 * 60 * 1000,
-    max: 1000,
-    message: {
-        success: false,
-        message: 'Demasiadas peticiones desde esta IP, intenta de nuevo más tarde.',
-        error: 'RATE_LIMIT_EXCEEDED',
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: (req, res) => {
-        console.log(`Rate limit exceeded for IP: ${req.ip}, Path: ${req.path}`);
-        res.status(429).json({
-            success: false,
-            message:
-                'Demasiadas peticiones desde esta IP, intenta de nuevo más tarde.',
-            error: 'RATE_LIMIT_EXCEEDED',
-            retryAfter: Math.round((req.rateLimit.resetTime - Date.now()) / 1000),
-        });
-    },
+  windowMs: 5 * 60 * 1000,
+  max: 10000,
+  message: {
+    success: false,
+    message: "Demasiadas peticiones desde esta IP, intenta de nuevo más tarde.",
+    error: "RATE_LIMIT_EXCEEDED",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    console.log(`Rate limit exceeded for IP: ${req.ip}, Path: ${req.path}`);
+    res.status(429).json({
+      success: false,
+      message:
+        "Demasiadas peticiones desde esta IP, intenta de nuevo más tarde.",
+      error: "RATE_LIMIT_EXCEEDED",
+      retryAfter: Math.round((req.rateLimit.resetTime - Date.now()) / 1000),
+    });
+  },
 });
