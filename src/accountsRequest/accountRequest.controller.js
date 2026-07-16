@@ -1,6 +1,6 @@
 import { AccountRequest } from "./accountRequest.model.js";
 import { Account } from "../accounts/account.model.js";
-import { nanoid } from "nanoid";
+import { customAlphabet } from 'nanoid';
 import { REQUEST_STATUS } from "../constants/requestStatus.js";
 import { ACCOUNT_TYPES } from "../constants/accountTypes.js";
 
@@ -64,8 +64,17 @@ export const approveRequest = async (req, res) => {
       });
     }
 
-    // 🔹 Crear número de cuenta
-    const numero_cuenta = nanoid(10);
+    let numero_cuenta;
+    let isUnique = false;
+
+    while (!isUnique) {
+      numero_cuenta = Array.from({ length: 10 }, () => Math.floor(Math.random() * 10)).join('');
+
+      const existingAccount = await Account.findOne({ where: { numero_cuenta } });
+      if (!existingAccount) {
+        isUnique = true;
+      }
+    }
 
     // 🔹 Crear cuenta
     await Account.create({

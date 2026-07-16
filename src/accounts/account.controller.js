@@ -1,5 +1,5 @@
 import { Account } from "./account.model.js";
-import { nanoid } from "nanoid";
+import { customAlphabet } from 'nanoid';
 import { User } from "../users/user.model.js";
 import { ACCOUNT_RULES } from "../constants/accountRules.js";
 
@@ -19,7 +19,16 @@ export const createAccount = async (req, res) => {
       });
     }
 
-    const numero_cuenta = nanoid(10);
+    let numero_cuenta;
+    let isUnique = false;
+
+    while (!isUnique) {
+      numero_cuenta = Array.from({ length: 10 }, () => Math.floor(Math.random() * 10)).join('');
+      const existingAccount = await Account.findOne({ where: { numero_cuenta } });
+      if (!existingAccount) {
+        isUnique = true;
+      }
+    }
 
     const account = await Account.create({
       ...req.body,
