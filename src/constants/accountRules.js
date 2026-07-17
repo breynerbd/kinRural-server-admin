@@ -1,0 +1,4 @@
+export const ACCOUNT_RULES = {
+  MIN_INITIAL_BALANCE: 100,
+  DEFAULT_BALANCE: 0,
+};

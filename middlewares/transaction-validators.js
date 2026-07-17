@@ -1,19 +1,55 @@
+import { body } from "express-validator";
+import { checkValidators } from "./check-validators.js";
+
+// ======================================================
+// CREATE TRANSACTION VALIDATOR
+// ======================================================
+
 export const validateCreateTransaction = [
-    body("fromAccountId")
-        .isInt()
-        .withMessage("Cuenta origen inválida"),
+  // ======================================================
+  // CUENTA ORIGEN
+  // ======================================================
 
-    body("toAccountId")
-        .isInt()
-        .withMessage("Cuenta destino inválida"),
+  body("cuenta_origen_id")
+    .notEmpty()
+    .withMessage("La cuenta de origen es obligatoria.")
+    .isInt({ min: 1 })
+    .withMessage("Cuenta origen inválida."),
 
-    body("amount")
-        .isFloat({ gt: 0 })
-        .withMessage("El monto debe ser mayor a 0"),
+  // ======================================================
+  // CUENTA DESTINO
+  // ======================================================
 
-    body("type")
-        .isIn(["TRANSFERENCIA", "DEPOSITO", "RETIRO"])
-        .withMessage("Tipo de transacción inválido"),
+  body("cuenta_destino_id")
+    .notEmpty()
+    .withMessage("La cuenta de destino es obligatoria.")
+    .isInt({ min: 1 })
+    .withMessage("Cuenta destino inválida."),
 
-    checkValidators,
+  // ======================================================
+  // MONTO
+  // ======================================================
+
+  body("monto")
+    .notEmpty()
+    .withMessage("El monto es obligatorio.")
+    .isFloat({ gt: 0 })
+    .withMessage("El monto debe ser mayor a 0."),
+
+  // ======================================================
+  // TRANSFERENCIA A LA MISMA CUENTA
+  // ======================================================
+
+  body("cuenta_destino_id").custom((value, { req }) => {
+    if (value === req.body.cuenta_origen_id) {
+      throw new Error("No puedes transferir a la misma cuenta.");
+    }
+    return true;
+  }),
+
+  // ======================================================
+  // VALIDATION RESULT
+  // ======================================================
+
+  checkValidators,
 ];
